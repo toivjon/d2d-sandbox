@@ -36,10 +36,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 // ============================================================================
 
-int main()
+void unregisterWindowClass()
 {
-  // build and register the window class for the application.
+  // unregister the window class so the system can release reserved resources.
+  if (UnregisterClass(WINDOW_CLASS_NAME, GetModuleHandle(nullptr)) == 0) {
+    fail("UnregisterClass failed");
+  }
+}
+
+// ============================================================================
+
+void registerWindowClass()
+{
+  // build a new empty window class descriptor.
   WNDCLASSEX windowClass = {};
+
+  // configure the class desriptor with desired definitions.
   windowClass.cbSize = sizeof(WNDCLASSEX);
   windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
@@ -49,13 +61,21 @@ int main()
   windowClass.lpfnWndProc = WndProc;
   windowClass.lpszClassName = WINDOW_CLASS_NAME;
   windowClass.style = CS_HREDRAW | CS_VREDRAW;
-  if (RegisterClassEx(&windowClass) != 0) {
+  
+  // register the descriptor so we can start using the new window class.
+  if (RegisterClassEx(&windowClass) == 0) {
     fail("RegisterClassEx failed");
   }
 
+  // specify that we unregister the window class when we exit the application.
+  atexit(unregisterWindowClass);
+}
 
+// ============================================================================
 
-  // release all reserved resources.
-  UnregisterClass(WINDOW_CLASS_NAME, GetModuleHandle(nullptr));
+int main()
+{
+  registerWindowClass();
+
   return 0;
 }
