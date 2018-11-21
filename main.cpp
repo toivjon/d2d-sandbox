@@ -4,11 +4,18 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <cassert>
 #include <string>
 
 // ============================================================================
 
 constexpr auto WINDOW_CLASS_NAME = "D2D-SANDBOX";
+constexpr auto WINDOW_WIDTH = 800;
+constexpr auto WINDOW_HEIGHT = 600;
+ 
+// ============================================================================
+
+HWND gHwnd = nullptr;
 
 // ============================================================================
 
@@ -36,16 +43,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 // ============================================================================
 
-void unregisterWindowClass()
-{
-  // unregister the window class so the system can release reserved resources.
-  if (UnregisterClass(WINDOW_CLASS_NAME, GetModuleHandle(nullptr)) == 0) {
-    fail("UnregisterClass failed");
-  }
-}
-
-// ============================================================================
-
 void registerWindowClass()
 {
   // build a new empty window class descriptor.
@@ -68,7 +65,45 @@ void registerWindowClass()
   }
 
   // specify that we unregister the window class when we exit the application.
-  atexit(unregisterWindowClass);
+  atexit([](){
+    if (UnregisterClass(WINDOW_CLASS_NAME, GetModuleHandle(nullptr)) == 0) {
+      fail("UnregisterClass failed");
+    }
+  });
+}
+
+// ============================================================================
+
+void createWindow()
+{
+  assert(gHwnd == nullptr);
+
+  // construct the main window for the application.
+  gHwnd = CreateWindowEx(
+    WS_EX_CLIENTEDGE,
+    WINDOW_CLASS_NAME,
+    "D2D Sanbox",
+    WS_OVERLAPPEDWINDOW,
+    CW_USEDEFAULT,
+    CW_USEDEFAULT,
+    WINDOW_WIDTH,
+    WINDOW_HEIGHT,
+    nullptr,
+    nullptr,
+    GetModuleHandle(nullptr),
+    nullptr);
+
+  // check how the operation succeeded.
+  if (gHwnd == nullptr) {
+    fail("CreateWindowEx failed");
+  }
+
+  // specify that we want to destroy the window when we exit the application.
+  atexit([]() {
+    if (DestroyWindow(gHwnd) == 0) {
+      fail("DestroyWindow failed");
+    }
+  });
 }
 
 // ============================================================================
@@ -76,6 +111,7 @@ void registerWindowClass()
 int main()
 {
   registerWindowClass();
+  createWindow();
 
   return 0;
 }
