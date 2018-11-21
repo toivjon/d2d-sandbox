@@ -38,7 +38,17 @@ inline void fail(const std::string& description)
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-  return DefWindowProc(hwnd, msg, wParam, lParam);
+  switch (msg) {
+  case WM_CLOSE:
+    DestroyWindow(hwnd);
+    break;
+  case WM_DESTROY:
+    PostQuitMessage(0);
+    break;
+  default:
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+  }
+  return 0;
 }
 
 // ============================================================================
@@ -100,7 +110,7 @@ void createWindow()
 
   // specify that we want to destroy the window when we exit the application.
   atexit([]() {
-    if (DestroyWindow(gHwnd) == 0) {
+    if (IsWindow(gHwnd) && DestroyWindow(gHwnd) == 0) {
       fail("DestroyWindow failed");
     }
   });
@@ -112,6 +122,19 @@ int main()
 {
   registerWindowClass();
   createWindow();
+
+  // set the window visible.
+  ShowWindow(gHwnd, SW_SHOW);
+  UpdateWindow(gHwnd);
+
+  // start the main loop of the application.
+  MSG msg = {};
+  while (msg.message != WM_QUIT) {
+    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+    }
+  }
 
   return 0;
 }
