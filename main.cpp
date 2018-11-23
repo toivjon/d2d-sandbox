@@ -454,11 +454,19 @@ int main()
       DispatchMessage(&msg);
     }
 
+    // the round rotation to be applied as a transform for the rectangle. 
+    static auto angle = 0.f;
+    angle += 0.1f;
+    D2D1_MATRIX_3X2_F rotation = D2D1::Matrix3x2F::Rotation(
+      angle,
+      D2D1::Point2F(400, 300)
+    );
+    
     // render to back buffer and then show it.
     d2dCtx.deviceCtx->BeginDraw();
-    d2dCtx.deviceCtx->DrawLine({ 400, 100 }, { 600, 400 }, whiteBrush.Get());
-    d2dCtx.deviceCtx->DrawLine({ 600, 400 }, { 200, 400 }, whiteBrush.Get());
-    d2dCtx.deviceCtx->DrawLine({ 200, 400 }, { 400, 100 }, whiteBrush.Get());
+    d2dCtx.deviceCtx->Clear(D2D1::ColorF(D2D1::ColorF::Black));
+    d2dCtx.deviceCtx->SetTransform(rotation);
+    d2dCtx.deviceCtx->DrawRectangle({300, 200, 500, 400}, whiteBrush.Get());
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
