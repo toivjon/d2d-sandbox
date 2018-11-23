@@ -439,6 +439,13 @@ int main()
   auto d2dCtx = createD2DContext(factory, d3dCtx);
   auto swapChain = createSwapChain(d3dCtx, d2dCtx);
 
+  // create a brush with solid white colour.
+  ComPtr<ID2D1SolidColorBrush> whiteBrush;
+  throwOnFail(d2dCtx.deviceCtx->CreateSolidColorBrush(
+    D2D1::ColorF(D2D1::ColorF::White),
+    &whiteBrush
+  ));
+
   // start the main loop of the application.
   MSG msg = {};
   while (msg.message != WM_QUIT) {
@@ -449,7 +456,9 @@ int main()
 
     // render to back buffer and then show it.
     d2dCtx.deviceCtx->BeginDraw();
-    // TODO perform rendering commands here.
+    d2dCtx.deviceCtx->DrawLine({ 400, 100 }, { 600, 400 }, whiteBrush.Get());
+    d2dCtx.deviceCtx->DrawLine({ 600, 400 }, { 200, 400 }, whiteBrush.Get());
+    d2dCtx.deviceCtx->DrawLine({ 200, 400 }, { 400, 100 }, whiteBrush.Get());
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
