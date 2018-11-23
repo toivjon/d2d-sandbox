@@ -32,6 +32,12 @@ struct D3DContext
   ComPtr<ID3D11DeviceContext> deviceCtx;
 };
 
+struct D2DContext
+{
+  ComPtr<ID2D1Device> device;
+  ComPtr<ID2D1DeviceContext> deviceCtx;
+};
+
 // ============================================================================
 
 HWND gHwnd = nullptr;
@@ -170,7 +176,7 @@ void createWindow()
 // the application threads. The definition which method to select is based how
 // the application is structured and how Direct2D components are being used.
 // ============================================================================
-ComPtr<ID2D1Factory> createD2DFactory()
+ComPtr<ID2D1Factory1> createD2DFactory()
 {
   // create creation options for the Direct2D factory item.
   D2D1_FACTORY_OPTIONS options;
@@ -179,7 +185,7 @@ ComPtr<ID2D1Factory> createD2DFactory()
   #endif
 
   // construct a new Direct2D factory to build Direct2D resources.
-  ComPtr<ID2D1Factory> factory;
+  ComPtr<ID2D1Factory1> factory;
   throwOnFail(D2D1CreateFactory(
     D2D1_FACTORY_TYPE_SINGLE_THREADED,
     options,
@@ -264,6 +270,47 @@ D3DContext createD3DContext()
 }
 
 // ============================================================================
+// Create a new Direct2D device and device context objects.
+// 
+// Direct2D allows usage of device context, which supports use of Direct3D in
+// the rendering process as well as enables the use of DXGI swap-chain that is
+// used to swap render targets directly to presentation canvas (e.g. window).
+//
+// Direct2D context is a set of state and command buffers that are used to
+// render to a target. It could be thought as an API for rendering commands.
+// 
+// Direct2D device context can be created with an additional build options that
+// are specified to context via the construction method. Here's a list of them.
+//   D2D1_DEVICE_CONTEXT_OPTIONS_NONE.....................Default options.
+//   D2D1_DEVICE_CONTEXT_OPTIONS_ENABLE_MULTITHREADED_*...Render across MT.
+//   D2D1_DEVICE_CONTEXT_OPTIONS_FORCE_DWORD..............???
+// ============================================================================
+D2DContext createD2DContext(ComPtr<ID2D1Factory1> factory, D3DContext& d3dCtx)
+{
+  assert(factory);
+  assert(d3dCtx.device);
+  assert(d3dCtx.deviceCtx);
+
+  // query the underlying DXGI device from the Direct3D device.
+  ComPtr<IDXGIDevice> dxgiDevice;
+  throwOnFail(d3dCtx.device.As(&dxgiDevice));
+
+  // create a Direct2D device for 2D rendering.
+  ComPtr<ID2D1Device> device;
+  throwOnFail(factory->CreateDevice(dxgiDevice.Get(), &device));
+
+  // create a Direct2D device context object.
+  ComPtr<ID2D1DeviceContext> deviceCtx;
+  throwOnFail(device->CreateDeviceContext(
+    D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+    &deviceCtx
+  ));
+
+  // return a Direct2D context containing the created objects.
+  return { device, deviceCtx };
+}
+
+// ============================================================================
 
 int main()
 {
@@ -277,6 +324,7 @@ int main()
   // initialise Direct2D framework.
   auto factory = createD2DFactory();
   auto d3dCtx = createD3DContext();
+  auto d2dCtx = createD2DContext(factory, d3dCtx);
 
   // start the main loop of the application.
   MSG msg = {};
