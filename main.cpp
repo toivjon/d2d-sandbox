@@ -350,10 +350,12 @@ D2DContext createD2DContext(ComPtr<ID2D1Factory1> factory, D3DContext& d3dCtx)
 //   DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
 //   DXGI_SWAP_CHAIN_FLAG_RESTRICTED_TO_ALL_HOLOGRAPHIC_DISPLAY
 // ============================================================================
-ComPtr<IDXGISwapChain> createSwapChain(D3DContext& d3dCtx)
+ComPtr<IDXGISwapChain> createSwapChain(D3DContext& d3dCtx, D2DContext& d2dCtx)
 {
   assert(d3dCtx.device);
   assert(d3dCtx.deviceCtx);
+  assert(d2dCtx.device);
+  assert(d2dCtx.deviceCtx);
 
   // create and define a swap chain descriptor.
   DXGI_SWAP_CHAIN_DESC1 descriptor = {};
@@ -392,6 +394,30 @@ ComPtr<IDXGISwapChain> createSwapChain(D3DContext& d3dCtx)
     &dxgiSwapChain
   ));
 
+  // construct a bitmap descriptor that is used with Direct2D rendering.
+  D2D1_BITMAP_PROPERTIES1 properties = {};
+  properties.bitmapOptions |= D2D1_BITMAP_OPTIONS_TARGET;
+  properties.bitmapOptions |= D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+  properties.pixelFormat.format = descriptor.Format;
+  properties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
+  properties.dpiX = 96.f;
+  properties.dpiY = 96.f;
+
+  // query the DXGI version of the back buffer surface.
+  ComPtr<IDXGISurface> dxgiBackBuffer;
+  throwOnFail(dxgiSwapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer)));
+
+  // create a new bitmap that's going to be used by the Direct2D.
+  ComPtr<ID2D1Bitmap1> bitmap;
+  throwOnFail(d2dCtx.deviceCtx->CreateBitmapFromDxgiSurface(
+    dxgiBackBuffer.Get(),
+    &properties,
+    &bitmap
+  ));
+
+  // assign the created bitmap as Direct2D render target.
+  d2dCtx.deviceCtx->SetTarget(bitmap.Get());
+
   // return the new swap chain.
   return dxgiSwapChain;
 }
@@ -411,7 +437,7 @@ int main()
   auto factory = createD2DFactory();
   auto d3dCtx = createD3DContext();
   auto d2dCtx = createD2DContext(factory, d3dCtx);
-  auto swapChain = createSwapChain(d3dCtx);
+  auto swapChain = createSwapChain(d3dCtx, d2dCtx);
 
   // start the main loop of the application.
   MSG msg = {};
@@ -420,6 +446,12 @@ int main()
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     }
+
+    // render to back buffer and then show it.
+    d2dCtx.deviceCtx->BeginDraw();
+    // TODO perform rendering commands here.
+    throwOnFail(d2dCtx.deviceCtx->EndDraw());
+    throwOnFail(swapChain->Present(1, 0));
   }
 
   return 0;
