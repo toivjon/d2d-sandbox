@@ -9,6 +9,7 @@
 #include <d2d1.h>
 #include <d2d1_1.h>
 #include <d3d11.h>
+#include <dxgi1_2.h>
 
 #include <cassert>
 #include <string>
@@ -17,6 +18,7 @@ using namespace Microsoft::WRL;
 
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
 
 // ============================================================================
 
@@ -311,6 +313,90 @@ D2DContext createD2DContext(ComPtr<ID2D1Factory1> factory, D3DContext& d3dCtx)
 }
 
 // ============================================================================
+// Create a swap chain for the rendering purposes.
+//
+// Swap chain is used to construct buffering mechanism that allows fast buffer
+// switching between the front and back buffers. In addition to buffer strategy
+// DirectX supports other kinds of swap chain (e.g. multi-sampling etc.).
+//
+// Constructing a swap chain is done by using a swap chain descriptor object,
+// which contains the options how the swap chain should behave. Here's a list.
+//    Width................Resolution width. Pass 0 to automatically size.
+//    Height...............Resolution height. Pass 0 to automatically size.
+//    Format...............The display format.
+//    Stereo...............Specifies whether to use stereo mode.
+//    SampleDesc.Count.....The amount of multisamples.
+//    SampleDesc.Quality...The quality of multisampling.
+//    BufferUsage..........The surface and CPU access options for back buffers.
+//    BufferCount..........The number of buffers (front + backbuffers).
+//    Scaling..............Specifies how back buffer is resized when required.
+//    SwapEffect...........Specifies how front buffer is handled on swap.
+//    AlphaMode............Defines the transparency behavior of back buffer(s).
+//    Flags................Special flags for the swap chain.
+// 
+// Swap chain special flags can be orred together to combine the configuration.
+// Here's a list of possible flags that can be assigned for the construction.
+//   DXGI_SWAP_CHAIN_FLAG_NONPREROTATED
+//   DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH
+//   DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE
+//   DXGI_SWAP_CHAIN_FLAG_RESTRICTED_CONTENT
+//   DXGI_SWAP_CHAIN_FLAG_RESTRICT_SHARED_RESOURCE_DRIVER
+//   DXGI_SWAP_CHAIN_FLAG_DISPLAY_ONLY
+//   DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
+//   DXGI_SWAP_CHAIN_FLAG_FOREGROUND_LAYER
+//   DXGI_SWAP_CHAIN_FLAG_FULLSCREEN_VIDEO
+//   DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO
+//   DXGI_SWAP_CHAIN_FLAG_HW_PROTECTED
+//   DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
+//   DXGI_SWAP_CHAIN_FLAG_RESTRICTED_TO_ALL_HOLOGRAPHIC_DISPLAY
+// ============================================================================
+ComPtr<IDXGISwapChain> createSwapChain(D3DContext& d3dCtx)
+{
+  assert(d3dCtx.device);
+  assert(d3dCtx.deviceCtx);
+
+  // create and define a swap chain descriptor.
+  DXGI_SWAP_CHAIN_DESC1 descriptor = {};
+  descriptor.Width = 0;
+  descriptor.Height = 0;
+  descriptor.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  descriptor.Stereo = false;
+  descriptor.SampleDesc.Count = 1;  // disable multi-sampling
+  descriptor.SampleDesc.Quality = 0;
+  descriptor.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  descriptor.BufferCount = 2;
+  descriptor.Scaling = DXGI_SCALING_NONE;
+  descriptor.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; // mandatory!
+  descriptor.Flags = 0;
+
+  // query the underlying DXGI device from the Direct3D device.
+  ComPtr<IDXGIDevice> dxgiDevice;
+  throwOnFail(d3dCtx.device.As(&dxgiDevice));
+
+  // query the underlying adapter (GPU/CPU) from the device.
+  ComPtr<IDXGIAdapter> dxgiAdapter;
+  throwOnFail(dxgiDevice->GetAdapter(&dxgiAdapter));
+
+  // query the factory object that created the DXGI device.
+  ComPtr<IDXGIFactory2> dxgiFactory;
+  throwOnFail(dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory)));
+
+  // create a swap chain for the window.
+  ComPtr<IDXGISwapChain1> dxgiSwapChain;
+  throwOnFail(dxgiFactory->CreateSwapChainForHwnd(
+    d3dCtx.device.Get(),
+    gHwnd,
+    &descriptor,
+    nullptr, // allow on all displays
+    nullptr,
+    &dxgiSwapChain
+  ));
+
+  // return the new swap chain.
+  return dxgiSwapChain;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -325,6 +411,7 @@ int main()
   auto factory = createD2DFactory();
   auto d3dCtx = createD3DContext();
   auto d2dCtx = createD2DContext(factory, d3dCtx);
+  auto swapChain = createSwapChain(d3dCtx);
 
   // start the main loop of the application.
   MSG msg = {};
