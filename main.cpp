@@ -3,9 +3,18 @@
 #define NOCOMM
 #define NOMINMAX
 #include <Windows.h>
+#include <wrl.h>
+#include <comdef.h>
+
+#include <d2d1.h>
+#include <d2d1_1.h>
 
 #include <cassert>
 #include <string>
+
+using namespace Microsoft::WRL;
+
+#pragma comment(lib, "d2d1.lib")
 
 // ============================================================================
 
@@ -32,6 +41,15 @@ inline void fail(const std::string& description)
 
   // kill the application.
   FatalExit(1);
+}
+
+// ============================================================================
+
+inline void throwOnFail(HRESULT hr)
+{
+  if (FAILED(hr)) {
+    throw _com_error(hr);
+  }
 }
 
 // ============================================================================
@@ -117,6 +135,52 @@ void createWindow()
 }
 
 // ============================================================================
+// Create a new Direct2D factory object.
+//
+// Direct2D handles factory objects as the root of building a new application.
+// These objects are used to build base resources that can be used to form the
+// final application structure and functionality.
+//
+// The global Direct2D debugging can be enabled by passing the factory options
+// to construction method by selecting any of the following values.
+//   D2D1_DEBUG_LEVEL_NONE..........To disable debug messages (production).
+//   D2D1_DEBUG_LEVEL_ERROR.........To generate only messages about errors.
+//   D2D1_DEBUG_LEVEL_WARNING.......To generate messages of errors and warn.
+//   D2D1_DEBUG_LEVEL_INFORMATION...To generate errors, warns and trace info.
+//
+// Direct2D allows factories to be created either for a multithreaded or single
+// threaded environment. This selection is passed to construction method.
+//   D2D1_FACTORY_TYPE_SINGLE_THREADED...To build for a single thread usage.
+//   D2D1_FACTORY_TYPE_MULTI_THREADED....To build for multithreaded usage.
+//
+// The way how Direct2D handles multithreaded items is based on serialisation,
+// where single threaded factories is not required to serialize incoming calls.
+// Multithreaded factories can be used by many threads, as calls are serialised
+// before they are executed, while also allowing resources to be shared between
+// the application threads. The definition which method to select is based how
+// the application is structured and how Direct2D components are being used.
+// ============================================================================
+ComPtr<ID2D1Factory> createD2DFactory()
+{
+  // create creation options for the Direct2D factory item.
+  D2D1_FACTORY_OPTIONS options;
+  #ifdef _DEBUG
+  options.debugLevel = D2D1_DEBUG_LEVEL_WARNING;
+  #endif
+
+  // construct a new Direct2D factory to build Direct2D resources.
+  ComPtr<ID2D1Factory> factory;
+  throwOnFail(D2D1CreateFactory(
+    D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    options,
+    factory.GetAddressOf()
+  ));
+
+  // return the new factory.
+  return factory;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -126,6 +190,9 @@ int main()
   // set the window visible.
   ShowWindow(gHwnd, SW_SHOW);
   UpdateWindow(gHwnd);
+
+  // initialise Direct2D framework.
+  auto factory = createD2DFactory();
 
   // start the main loop of the application.
   MSG msg = {};
