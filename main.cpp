@@ -446,6 +446,13 @@ int main()
     &whiteBrush
   ));
 
+  // create a brush with solid green colour.
+  ComPtr<ID2D1SolidColorBrush> greenBrush;
+  throwOnFail(d2dCtx.deviceCtx->CreateSolidColorBrush(
+    D2D1::ColorF(D2D1::ColorF::Green),
+    &greenBrush
+  ));
+
   // start the main loop of the application.
   MSG msg = {};
   while (msg.message != WM_QUIT) {
@@ -466,7 +473,8 @@ int main()
     d2dCtx.deviceCtx->BeginDraw();
     d2dCtx.deviceCtx->Clear(D2D1::ColorF(D2D1::ColorF::Black));
     d2dCtx.deviceCtx->SetTransform(rotation);
-    d2dCtx.deviceCtx->DrawRectangle({300, 200, 500, 400}, whiteBrush.Get());
+    d2dCtx.deviceCtx->DrawRectangle({ 300, 200, 500, 400 }, whiteBrush.Get(), 10.f);
+    d2dCtx.deviceCtx->FillRectangle({ 300, 200, 500, 400 }, greenBrush.Get());
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
