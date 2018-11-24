@@ -448,6 +448,49 @@ ComPtr<IDWriteFactory> createWriteFactory()
 }
 
 // ============================================================================
+// Create a new DirectWrite text format.
+//
+// DirectWrite uses the IDWriteFactory instance to build new text formats. New
+// formats can be created with the construction method and with an additional
+// parameters which specify the base structure for the textual formats.
+//   font-family.......The name of the font family (e.g. Arial).
+//   font-collection...Use null to use system font collection.
+//   font-weight.......Defines the thickness of the font (e.g. bold).
+//   font-style........Defines the style of the font (e.g. italic).
+//   font-stretch......Defines how fonts are stretched.
+//   font-size.........The font size.
+//   font-locale.......The name of the text locale.
+//
+// Formats can be also used to specify how the text is aligned, and how whole
+// text paragraph is aligned, spacing, reading-direction etc. By overall, they
+// are highly customizable in a similar way that with any text editors.
+// ============================================================================
+ComPtr<IDWriteTextFormat> createWriteTextFormat(ComPtr<IDWriteFactory> factory)
+{
+  assert(factory);
+
+  // construct a new DirectWrite text format to format text rendering.
+  ComPtr<IDWriteTextFormat> format;
+  throwOnFail(factory->CreateTextFormat(
+    L"Calibri",
+    nullptr,
+    DWRITE_FONT_WEIGHT_REGULAR,
+    DWRITE_FONT_STYLE_NORMAL,
+    DWRITE_FONT_STRETCH_NORMAL,
+    72.f,
+    L"en-us",
+    &format
+  ));
+
+  // specify some additional configuration for the text format.
+  throwOnFail(format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER));
+  throwOnFail(format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER));
+
+  // return the new created format.
+  return format;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -466,6 +509,7 @@ int main()
 
   // initialize DirectWrite framework.
   auto writeFactory = createWriteFactory();
+  auto textFormat = createWriteTextFormat(writeFactory);
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
@@ -496,6 +540,11 @@ int main()
       angle,
       D2D1::Point2F(400, 300)
     );
+
+    // create rect for text rendering area.
+    D2D1_RECT_F textRect = D2D1::RectF(
+      0, 50, 800, 50
+    );
     
     // render to back buffer and then show it.
     d2dCtx.deviceCtx->BeginDraw();
@@ -503,7 +552,13 @@ int main()
     d2dCtx.deviceCtx->SetTransform(rotation);
     d2dCtx.deviceCtx->DrawRectangle({ 300, 200, 500, 400 }, whiteBrush.Get(), 10.f);
     d2dCtx.deviceCtx->FillRectangle({ 300, 200, 500, 400 }, greenBrush.Get());
-   // d2dCtx.deviceCtx->DrawTe
+    d2dCtx.deviceCtx->SetTransform(D2D1::Matrix3x2F::Identity());
+    d2dCtx.deviceCtx->DrawTextA(
+      L"Hello Direct2D!",
+      (UINT) strlen("Hello Direct2D!"),
+      textFormat.Get(),
+      &textRect,
+      whiteBrush.Get());
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
