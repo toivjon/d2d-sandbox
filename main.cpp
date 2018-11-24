@@ -5,11 +5,13 @@
 #include <Windows.h>
 #include <wrl.h>
 #include <comdef.h>
+#include <Shlwapi.h>
 
 #include <d2d1.h>
-#include <d2d1_1.h>
+#include <d2d1_3.h>
+#include <d2d1svg.h>
 #include <d3d11.h>
-#include <dxgi1_2.h>
+#include <dxgi1_3.h>
 #include <dwrite.h>
 
 #include <cassert>
@@ -21,6 +23,7 @@ using namespace Microsoft::WRL;
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dwrite.lib")
+#pragma comment(lib, "Shlwapi.lib")
 
 // ============================================================================
 
@@ -39,7 +42,7 @@ struct D3DContext
 struct D2DContext
 {
   ComPtr<ID2D1Device> device;
-  ComPtr<ID2D1DeviceContext> deviceCtx;
+  ComPtr<ID2D1DeviceContext5> deviceCtx;
 };
 
 // ============================================================================
@@ -180,7 +183,7 @@ void createWindow()
 // the application threads. The definition which method to select is based how
 // the application is structured and how Direct2D components are being used.
 // ============================================================================
-ComPtr<ID2D1Factory1> createD2DFactory()
+ComPtr<ID2D1Factory6> createD2DFactory()
 {
   // create creation options for the Direct2D factory item.
   D2D1_FACTORY_OPTIONS options;
@@ -189,7 +192,7 @@ ComPtr<ID2D1Factory1> createD2DFactory()
   #endif
 
   // construct a new Direct2D factory to build Direct2D resources.
-  ComPtr<ID2D1Factory1> factory;
+  ComPtr<ID2D1Factory6> factory;
   throwOnFail(D2D1CreateFactory(
     D2D1_FACTORY_TYPE_SINGLE_THREADED,
     options,
@@ -289,22 +292,22 @@ D3DContext createD3DContext()
 //   D2D1_DEVICE_CONTEXT_OPTIONS_ENABLE_MULTITHREADED_*...Render across MT.
 //   D2D1_DEVICE_CONTEXT_OPTIONS_FORCE_DWORD..............???
 // ============================================================================
-D2DContext createD2DContext(ComPtr<ID2D1Factory1> factory, D3DContext& d3dCtx)
+D2DContext createD2DContext(ComPtr<ID2D1Factory6> factory, D3DContext& d3dCtx)
 {
   assert(factory);
   assert(d3dCtx.device);
   assert(d3dCtx.deviceCtx);
 
   // query the underlying DXGI device from the Direct3D device.
-  ComPtr<IDXGIDevice> dxgiDevice;
+  ComPtr<IDXGIDevice3> dxgiDevice;
   throwOnFail(d3dCtx.device.As(&dxgiDevice));
 
   // create a Direct2D device for 2D rendering.
-  ComPtr<ID2D1Device> device;
+  ComPtr<ID2D1Device5> device;
   throwOnFail(factory->CreateDevice(dxgiDevice.Get(), &device));
 
   // create a Direct2D device context object.
-  ComPtr<ID2D1DeviceContext> deviceCtx;
+  ComPtr<ID2D1DeviceContext5> deviceCtx;
   throwOnFail(device->CreateDeviceContext(
     D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
     &deviceCtx
@@ -491,6 +494,36 @@ ComPtr<IDWriteTextFormat> createWriteTextFormat(ComPtr<IDWriteFactory> factory)
 }
 
 // ============================================================================
+// Open a SVG file from the local filesystem.
+// 
+// Windows 10 Creators Update introduced a support for SVG image rendering. It
+// does allow Direct2D to directly parse and draw SVG images without having to
+// rasterise them first. This feature allows making games to scale up and down
+// in a dynamical way without reducing the visual output quality.
+// ============================================================================
+ComPtr<ID2D1SvgDocument> openSvg(D2DContext& d2dCtx)
+{
+  // open a stream to target file on the file system.
+  ComPtr<IStream> stream;
+  throwOnFail(SHCreateStreamOnFileA(
+    "foo.svg",
+    STGM_READ,
+    stream.GetAddressOf()
+  ));
+
+  // parse the stream into an SVG document.
+  ComPtr<ID2D1SvgDocument> svg;
+  throwOnFail(d2dCtx.deviceCtx->CreateSvgDocument(
+    stream.Get(),
+    D2D1_SIZE_F({ 200, 150 }),
+    &svg
+  ));
+
+  // return the loaded document.
+  return svg;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -510,6 +543,9 @@ int main()
   // initialize DirectWrite framework.
   auto writeFactory = createWriteFactory();
   auto textFormat = createWriteTextFormat(writeFactory);
+
+  // initialize and load SVG specific objects.
+  auto svg = openSvg(d2dCtx);
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
@@ -559,6 +595,8 @@ int main()
       textFormat.Get(),
       &textRect,
       whiteBrush.Get());
+    d2dCtx.deviceCtx->SetTransform(D2D1::Matrix3x2F::Translation({150,100}));
+    d2dCtx.deviceCtx->DrawSvgDocument(svg.Get());
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
