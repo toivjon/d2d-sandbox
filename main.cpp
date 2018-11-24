@@ -133,7 +133,7 @@ void createWindow()
   gHwnd = CreateWindowEx(
     WS_EX_CLIENTEDGE,
     WINDOW_CLASS_NAME,
-    "D2D Sanbox",
+    "D2D Sandbox",
     WS_OVERLAPPEDWINDOW,
     CW_USEDEFAULT,
     CW_USEDEFAULT,
