@@ -10,6 +10,7 @@
 #include <d2d1_1.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
+#include <dwrite.h>
 
 #include <cassert>
 #include <string>
@@ -19,6 +20,7 @@ using namespace Microsoft::WRL;
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dwrite.lib")
 
 // ============================================================================
 
@@ -423,6 +425,29 @@ ComPtr<IDXGISwapChain> createSwapChain(D3DContext& d3dCtx, D2DContext& d2dCtx)
 }
 
 // ============================================================================
+// Create a new DirectWrite factory object.
+//
+// IDWriteFactory is the starting point for using DirectWrite functionality. It
+// is the root object that creates a set of objects that can be used together.
+// The type of the factory is given to the construction function as parameter.
+//   DWRITE_FACTORY_TYPE_SHARED.....Allow the reuse of cached font data.
+//   DWRITE_FACTORY_TYPE_ISOLATED...Objects do no interact with internal state.
+// ============================================================================
+ComPtr<IDWriteFactory> createWriteFactory()
+{
+  // construct a new DirectWrite factory to build text resources.
+  ComPtr<IDWriteFactory> factory;
+  throwOnFail(DWriteCreateFactory(
+    DWRITE_FACTORY_TYPE_SHARED,
+    __uuidof(IDWriteFactory),
+    reinterpret_cast<IUnknown**>(factory.GetAddressOf())
+  ));
+
+  // return the create factory.
+  return factory;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -438,6 +463,9 @@ int main()
   auto d3dCtx = createD3DContext();
   auto d2dCtx = createD2DContext(factory, d3dCtx);
   auto swapChain = createSwapChain(d3dCtx, d2dCtx);
+
+  // initialize DirectWrite framework.
+  auto writeFactory = createWriteFactory();
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
@@ -475,6 +503,7 @@ int main()
     d2dCtx.deviceCtx->SetTransform(rotation);
     d2dCtx.deviceCtx->DrawRectangle({ 300, 200, 500, 400 }, whiteBrush.Get(), 10.f);
     d2dCtx.deviceCtx->FillRectangle({ 300, 200, 500, 400 }, greenBrush.Get());
+   // d2dCtx.deviceCtx->DrawTe
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
