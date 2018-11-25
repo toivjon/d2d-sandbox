@@ -6,6 +6,7 @@
 #include <wrl.h>
 #include <comdef.h>
 #include <Shlwapi.h>
+#include <wincodec.h>
 
 #include <d2d1.h>
 #include <d2d1_3.h>
@@ -524,6 +525,31 @@ ComPtr<ID2D1SvgDocument> openSvg(D2DContext& d2dCtx)
 }
 
 // ============================================================================
+// Create a new Windows Imaging Component (WIC) factory object.
+//
+// The IWICImagingFactory is one of the main components in the WIC framework.
+// This component is used to perform creation of WIC components such as image
+// decoders, encoders and stream that can be further used by the Direct2D.
+// ============================================================================
+ComPtr<IWICImagingFactory> createWICFactory()
+{
+  // initialize COM.
+  throwOnFail(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+
+  // construct a new WIC imaging factory to load images.
+  ComPtr<IWICImagingFactory> factory;
+  throwOnFail(CoCreateInstance(
+    CLSID_WICImagingFactory,
+    nullptr,
+    CLSCTX_INPROC_SERVER,
+    IID_PPV_ARGS(&factory)
+  ));
+
+  // return the new created factory instance.
+  return factory;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -546,6 +572,9 @@ int main()
 
   // initialize and load SVG specific objects.
   auto svg = openSvg(d2dCtx);
+
+  // load an image with Windows Imaging Component API.
+  auto wicFactory = createWICFactory();
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
