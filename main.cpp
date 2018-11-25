@@ -550,6 +550,58 @@ ComPtr<IWICImagingFactory> createWICFactory()
 }
 
 // ============================================================================
+// Load bitmap with WIC and convert it to Direct2D object.
+//
+// Images can be loaded directly by using the WIC API, where the API does have
+// a support for identifying the correct decoder based on the target filename.
+// Decoder is used to load the image data as a frame, which is then converted
+// into a Direct2D compatible image by using the render target object.
+// ============================================================================
+ComPtr<ID2D1Bitmap> loadBitmap(ComPtr<IWICImagingFactory> factory,
+  D2DContext& d2dCtx)
+{
+  assert(factory);
+
+  // create a new decoder for the image based on the target filename.
+  ComPtr<IWICBitmapDecoder> decoder;
+  throwOnFail(factory->CreateDecoderFromFilename(
+    L"foo.png",
+    nullptr,
+    GENERIC_READ,
+    WICDecodeMetadataCacheOnLoad,
+    &decoder
+  ));
+
+  // read the image as a bitmap frame.
+  ComPtr<IWICBitmapFrameDecode> frame;
+  throwOnFail(decoder->GetFrame(0, &frame));
+
+  // create and initialize a format converter for Direct2D compatible images.
+  ComPtr<IWICFormatConverter> formatConverter;
+  throwOnFail(factory->CreateFormatConverter(&formatConverter));
+  throwOnFail(formatConverter->Initialize(
+    frame.Get(),
+    GUID_WICPixelFormat32bppPBGRA,
+    WICBitmapDitherTypeNone,
+    nullptr,
+    0.f,
+    WICBitmapPaletteTypeMedianCut
+  ));
+
+
+  // create a Direct2D bitmap from the WIC image source.
+  ComPtr<ID2D1Bitmap> bitmap;
+  throwOnFail(d2dCtx.deviceCtx->CreateBitmapFromWicBitmap(
+    formatConverter.Get(),
+    nullptr,
+    &bitmap
+  ));
+
+  // return the image that was loaded.
+  return bitmap;
+}
+
+// ============================================================================
 
 int main()
 {
@@ -575,6 +627,7 @@ int main()
 
   // load an image with Windows Imaging Component API.
   auto wicFactory = createWICFactory();
+  auto image = loadBitmap(wicFactory, d2dCtx);
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
@@ -610,6 +663,9 @@ int main()
     D2D1_RECT_F textRect = D2D1::RectF(
       0, 50, 800, 50
     );
+
+    // query the size of the loaded bitmap image to be drawn.
+    auto imageSize = image->GetSize();
     
     // render to back buffer and then show it.
     d2dCtx.deviceCtx->BeginDraw();
@@ -626,6 +682,12 @@ int main()
       whiteBrush.Get());
     d2dCtx.deviceCtx->SetTransform(D2D1::Matrix3x2F::Translation({150,100}));
     d2dCtx.deviceCtx->DrawSvgDocument(svg.Get());
+    d2dCtx.deviceCtx->DrawBitmap(
+      image.Get(),
+      D2D1::RectF(
+        0, 0, imageSize.width, imageSize.height
+      )
+    );
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
