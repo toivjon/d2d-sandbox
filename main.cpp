@@ -558,14 +558,14 @@ ComPtr<IWICImagingFactory> createWICFactory()
 // into a Direct2D compatible image by using the render target object.
 // ============================================================================
 ComPtr<ID2D1Bitmap> loadBitmap(ComPtr<IWICImagingFactory> factory,
-  D2DContext& d2dCtx)
+  D2DContext& d2dCtx, const std::wstring& filename)
 {
   assert(factory);
 
   // create a new decoder for the image based on the target filename.
   ComPtr<IWICBitmapDecoder> decoder;
   throwOnFail(factory->CreateDecoderFromFilename(
-    L"foo.png",
+    filename.c_str(),
     nullptr,
     GENERIC_READ,
     WICDecodeMetadataCacheOnLoad,
@@ -587,7 +587,6 @@ ComPtr<ID2D1Bitmap> loadBitmap(ComPtr<IWICImagingFactory> factory,
     0.f,
     WICBitmapPaletteTypeMedianCut
   ));
-
 
   // create a Direct2D bitmap from the WIC image source.
   ComPtr<ID2D1Bitmap> bitmap;
@@ -627,7 +626,7 @@ int main()
 
   // load an image with Windows Imaging Component API.
   auto wicFactory = createWICFactory();
-  auto image = loadBitmap(wicFactory, d2dCtx);
+  auto image = loadBitmap(wicFactory, d2dCtx, L"foo.png");
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
