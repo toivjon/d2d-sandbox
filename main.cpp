@@ -627,6 +627,7 @@ int main()
   // load an image with Windows Imaging Component API.
   auto wicFactory = createWICFactory();
   auto image = loadBitmap(wicFactory, d2dCtx, L"foo.png");
+  auto sheet = loadBitmap(wicFactory, d2dCtx, L"spritesheet.png");
 
   // create a brush with solid white colour.
   ComPtr<ID2D1SolidColorBrush> whiteBrush;
@@ -687,6 +688,29 @@ int main()
         0, 0, imageSize.width, imageSize.height
       )
     );
+
+    // animate spritesheet images with a trivial animation.
+    static auto const TICKS_PER_FRAME = 50;
+    static auto frame = 0;
+    static auto frame_ticks = TICKS_PER_FRAME;
+    frame_ticks--;
+    if (frame_ticks <= 0) {
+      frame = (frame + 1) % 4;
+      frame_ticks = TICKS_PER_FRAME;
+    }
+    d2dCtx.deviceCtx->SetTransform(D2D1::Matrix3x2F::Translation({ 500, 500 }));
+    d2dCtx.deviceCtx->DrawBitmap(
+      sheet.Get(),
+      D2D1::RectF(
+        0, 0, 25, 25
+      ),
+      1.f,
+      D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+      D2D1::RectF(
+        5 + (frame * 30), 5, 30 + (frame * 30), 30
+      )
+    );
+
     throwOnFail(d2dCtx.deviceCtx->EndDraw());
     throwOnFail(swapChain->Present(1, 0));
   }
